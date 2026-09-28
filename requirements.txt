@@ -1,2 +1,2 @@
-laya[langchain]>=0.3.21
-langgraph>=0.2
+laya[langchain]==0.3.21
+langgraph>=1.0

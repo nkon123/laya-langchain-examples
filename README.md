@@ -1,7 +1,7 @@
 # laya-langchain-examples
 
 [Laya](https://github.com/NandhaKishorM/laya)를 **LangChain / LangGraph**에서 쓰는 예제 모음입니다.
-**인터넷이 막힌 사내 PC**에서 로컬 모델 폴더만으로 돌아가도록 구성했습니다.
+모델은 로컬 폴더에서 읽고, Hugging Face Hub에 접속하지 않도록 구성했습니다.
 
 Laya는 텍스트를 생성하는 LLM이 아닙니다. 입력 텍스트와 "타입이 있는 질문"을 받아
 `choice`(분류), `score`(등급), `noul`(예/아니오 확률)을 한 번의 forward pass로 돌려주는
@@ -28,66 +28,62 @@ HF 저장소 `convaiinnovations/laya`에 세 체크포인트가 함께 들어 �
 `Router`는 입력 언어를 감지해서 영어는 english, 그 외는 multilingual로 자동 분기합니다.
 english 폴더가 없으면 영어 입력도 multilingual이 처리합니다 (`laya_local.py` 참고).
 
-## 사내 PC 설치 (오프라인)
+## 설치 (Windows, Python 3.14)
 
 ### 준비물
 - Windows 10/11 x64
-- **Python 3.11** (python.org 설치본 권장). 휠 번들이 3.11용으로 받아져 있습니다.
-- 모델 폴더 `laya/`와 휠 번들 `wheels-py311/`
+- **Python 3.14** (python.org 설치본 권장)
+- 모델 폴더 `laya/` (`model.safetensors`, `multilingual/`, `typed-decisions/`)
 
-### 1. 폴더 배치
-
-```
-C:\laya\
-├─ laya\                     ← 모델 (model.safetensors, multilingual\, typed-decisions\)
-├─ wheels-py311\             ← 오프라인 설치용 휠
-└─ laya-langchain-examples\  ← 이 저장소
-```
-
-### 2. 가상환경 만들고 오프라인 설치 (PowerShell)
+### 1. 설치
 
 ```powershell
-cd C:\laya\laya-langchain-examples
-py -3.11 -m venv .venv
-.\.venv\Scripts\python.exe -m pip install --no-index --find-links ..\wheels-py311 "laya[langchain]" langgraph
-.\.venv\Scripts\python.exe -c "import laya, torch; print(laya.__version__, torch.__version__)"
+git clone https://github.com/nkon123/laya-langchain-examples
+cd laya-langchain-examples
+.\scripts\install.ps1 -ModelDir C:\laya\laya
 ```
 
-`scripts\install_offline.ps1`이 위 과정을 한 번에 수행합니다.
-
-> 사내 PC에 애플리케이션 제어 정책이 있으면 `pip.exe` 등 venv 안의 실행 파일이 차단될 수 있습니다.
-> 항상 `python.exe -m pip` 형태로 실행하고, 그래도 막히면 보안팀에 Python 실행 허용을 요청하세요.
-
-### 3. 실행
+`install.ps1`은 `.venv`를 만들고 `requirements.txt`를 설치한 뒤 예제 01을 실행합니다. 직접 하려면:
 
 ```powershell
-$env:LAYA_MODEL_DIR = "C:\laya\laya"
+py -3.14 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+```
+
+> 애플리케이션 제어 정책이 있는 PC에서는 `pip.exe` 등 venv 안의 실행 파일이 차단될 수 있습니다.
+> 항상 `python.exe -m pip` 형태로 실행하세요.
+
+### 2. 실행
+
+```powershell
+$env:LAYA_MODEL_DIR = "C:\laya\laya"     # 영구 등록: setx LAYA_MODEL_DIR "C:\laya\laya"
 $env:PYTHONIOENCODING = "utf-8"
 .\.venv\Scripts\python.exe examples\01_basic_predict.py
 .\.venv\Scripts\python.exe examples\02_langchain_lcel.py
 .\.venv\Scripts\python.exe examples\03_langgraph_support.py
 ```
 
-`laya_local.py`가 `HF_HUB_OFFLINE=1`을 설정하므로 외부 네트워크에 접속하지 않습니다.
+`laya_local.py`가 `HF_HUB_OFFLINE=1`을 설정하므로 모델은 로컬 폴더에서만 읽습니다.
 CPU에서 한 건당 수백 ms 정도 걸립니다.
 
-### 인터넷이 되는 PC라면
+## 외부 통신 검토 (laya 0.3.21)
 
-```powershell
-py -3.11 -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -r requirements.txt
-# 모델은 첫 실행 때 자동 다운로드되며, 로컬 폴더를 쓰려면 LAYA_MODEL_DIR을 지정합니다.
-```
+- 패키지 소스에 텔레메트리, 외부 프로세스 실행, `eval`/`exec`, pickle 로딩이 없습니다.
+  모델은 safetensors라 로드 시 코드가 실행되지 않습니다.
+- Python audit hook으로 예제 3개 실행 중 소켓 연결·DNS 조회·프로세스 실행을 기록한 결과 0건이었습니다.
+- 아래 설정을 쓰면 외부 통신이 생깁니다. 예제는 모두 사용하지 않습니다.
 
-### 휠 번들을 다시 만들려면 (인터넷 되는 PC)
+| 조건 | 동작 |
+|---|---|
+| `LayaRouter` 등에 `base_url` 지정 | 입력 텍스트를 그 서버로 전송 |
+| 로컬 경로 없이 `Router()` 사용 | Hugging Face에서 모델 다운로드 |
+| `LANGSMITH_TRACING=true` + API 키 | LangChain이 입출력을 LangSmith로 전송 |
+| `laya-serve` 실행 | 기본 `0.0.0.0`, 인증 없음 → `LAYA_HOST=127.0.0.1`, `LAYA_API_KEY` 설정 권장 |
 
-```powershell
-python -m pip download "laya[langchain]" langgraph -d wheels-py311 `
-  --platform win_amd64 --python-version 3.11 --only-binary=:all: `
-  --extra-index-url https://download.pytorch.org/whl/cpu
-```
+검토한 버전으로 고정하기 위해 `requirements.txt`는 `laya[langchain]==0.3.21`입니다.
+올릴 때는 변경 내용을 다시 확인하세요.
 
-## 실측 결과와 한계 (CPU, laya 0.3.21)
+## 실측 결과와 한계 (CPU, Python 3.14, laya 0.3.21)
 
 - **01 기본 분류**: 한국어·일본어 결제/장애 문의의 부서 분류와 긴급도는 기대대로 나왔습니다.
 - **라우팅**: 한국어 입력은 criteria를 한국어로 쓸 때 더 안정적입니다. 6개 샘플 중 4개가 정답이었고,
