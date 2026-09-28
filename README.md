@@ -12,6 +12,7 @@ Laya는 텍스트를 생성하는 LLM이 아닙니다. 입력 텍스트와 "타�
 | `examples/01_basic_predict.py` | `Router.predict` 기본 사용. 한/영/일 문장 → 부서·긴급도·이탈위험 |
 | `examples/02_langchain_lcel.py` | LCEL: `LayaGuardrail` → `LayaRouter` → `RunnableBranch` |
 | `examples/03_langgraph_support.py` | LangGraph: guard → triage → 조건부 엣지(`LayaRouter`) → 팀별 노드 |
+| `examples/04_compare_local_llm.py` | 같은 입력·같은 질문으로 Laya와 로컬 LLM(Ollama 등) 비교 |
 
 외부 LLM은 호출하지 않습니다. 팀별 노드는 자리표시자이므로, 사내 LLM(Ollama, vLLM 등)이 있으면 그 자리에 연결하면 됩니다.
 
@@ -65,6 +66,35 @@ $env:PYTHONIOENCODING = "utf-8"
 
 `laya_local.py`가 `HF_HUB_OFFLINE=1`을 설정하므로 모델은 로컬 폴더에서만 읽습니다.
 CPU에서 한 건당 수백 ms 정도 걸립니다.
+
+## 로컬 LLM과 비교 (04)
+
+`samples.py`에 예제 01~03의 입력, 질문, 정답 라벨이 모여 있습니다. `04_compare_local_llm.py`는
+Laya의 질문 정의를 그대로 프롬프트로 바꿔 OpenAI 호환 API(Ollama, LM Studio, vLLM 등)에 보내고,
+정확도, 건당 응답 시간, JSON 파싱 실패를 비교합니다.
+
+```powershell
+$env:LLM_BASE_URL = "http://127.0.0.1:11434/v1"   # Ollama 기본값
+$env:LLM_MODEL = "gemma4:latest"
+.\.venv\Scripts\python.exe examples\04_compare_local_llm.py                # 전체
+.\.venv\Scripts\python.exe examples\04_compare_local_llm.py --tasks route  # 일부만
+```
+
+채팅 UI에 직접 붙여 넣어 볼 프롬프트는 [`prompts/local_llm_prompts.md`](prompts/local_llm_prompts.md)에 있습니다.
+
+측정 예 (Laya: Ryzen 7 9800X3D **CPU** / gemma4 8B Q4: Ollama, RTX 5080 **GPU**):
+
+| task | n | Laya 정확도 | Laya ms/건 | LLM 정확도 | LLM ms/건 |
+|---|---|---|---|---|---|
+| classify | 4 | 7/8 | 357 | 8/8 | 2,063 |
+| route | 6 | 4/6 | 77 | 6/6 | 2,679 |
+| guard | 8 | 14/16 | 95 | 16/16 | 1,024 |
+| triage | 3 | 8/11 | 267 | 11/11 | 4,005 |
+
+- 이 샘플에서는 8B LLM이 모두 맞혔고, Laya는 한국어 문의에서 이탈 위험·긴급도·영업 문의를 놓쳤습니다.
+- Laya는 CPU에서도 LLM(GPU)보다 4~35배 빨랐습니다. GPU 없는 PC라면 LLM은 훨씬 더 느려집니다.
+- Laya는 답이 항상 정해진 형식(선택지/확률)으로 나와 파싱 실패가 없고, 확률을 임계값으로 조정할 수 있습니다.
+- 21건, 정답 라벨은 작성자 판단이라 벤치마크가 아닙니다. 실제 판단은 자체 데이터로 하세요.
 
 ## 외부 통신 검토 (laya 0.3.21)
 

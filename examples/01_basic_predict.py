@@ -8,35 +8,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from laya_local import local_router  # noqa: E402
+from samples import CLASSIFY_CASES, CLASSIFY_QUESTIONS  # noqa: E402
 
-QUESTIONS = {
-    "department": {
-        "type": "choice",
-        "instructions": "Which department should handle this?",
-        "criteria": {
-            "billing": "invoices, payments, refunds, duplicate charges",
-            "technical": "bugs, outages, errors, login problems",
-            "sales": "pricing, contracts, demos",
-            "other": "everything else",
-        },
-    },
-    "urgency": {
-        "type": "score",
-        "instructions": "How urgent is this?",
-        "criteria": ["not urgent", "soon", "blocking"],
-    },
-    "churn_risk": {
-        "type": "noul",
-        "instructions": "Does the customer threaten to cancel or leave?",
-    },
-}
-
-TEXTS = [
-    "3월 요금이 두 번 결제됐어요. 중복 결제 건 환불해 주세요.",
-    "로그인이 안 돼서 업무가 완전히 멈췄습니다. 오늘 안에 해결 안 되면 해지하겠습니다.",
-    "Hi, could you send me pricing for the enterprise plan?",
-    "請求書の金額が契約と違います。確認してください。",
-]
+QUESTIONS = CLASSIFY_QUESTIONS
+TEXTS = [text for text, _ in CLASSIFY_CASES]
 
 
 def main():
