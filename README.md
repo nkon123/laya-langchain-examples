@@ -13,6 +13,7 @@ Laya는 텍스트를 생성하는 LLM이 아닙니다. 입력 텍스트와 "타�
 | `examples/02_langchain_lcel.py` | LCEL: `LayaGuardrail` → `LayaRouter` → `RunnableBranch` |
 | `examples/03_langgraph_support.py` | LangGraph: guard → triage → 조건부 엣지(`LayaRouter`) → 팀별 노드 |
 | `examples/04_compare_local_llm.py` | 같은 입력·같은 질문으로 Laya와 로컬 LLM(Ollama 등) 비교 |
+| `examples/05_question_types.py` | 질문 타입별 LCEL: choice(`LayaRouter`) / score·noul(`LayaEvaluator`) / `RunnableParallel` |
 
 외부 LLM은 호출하지 않습니다. 팀별 노드는 자리표시자이므로, 사내 LLM(Ollama, vLLM 등)이 있으면 그 자리에 연결하면 됩니다.
 
