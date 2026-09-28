@@ -44,7 +44,9 @@ cd laya-langchain-examples
 .\scripts\install.ps1 -ModelDir C:\laya\laya
 ```
 
-`install.ps1`은 `.venv`를 만들고 `requirements.txt`를 설치한 뒤 예제 01을 실행합니다. 직접 하려면:
+`install.ps1`은 `nvidia-smi`로 CUDA 버전을 확인해 맞는 PyTorch(cu130 / cu126 / cpu)를 먼저 설치하고,
+`requirements.txt`를 설치한 뒤 예제 01을 실행합니다. 빌드를 직접 고르려면 `-Cuda cu126` 처럼 지정합니다.
+CPU만 쓸 때 직접 하려면:
 
 ```powershell
 py -3.14 -m venv .venv
@@ -98,23 +100,32 @@ $env:LLM_MODEL = "gemma4:latest"
 
 ## GPU로 실행 (NVIDIA)
 
-laya는 PyTorch가 CUDA를 인식하면 자동으로 GPU를 씁니다. **CUDA 빌드 torch를 먼저** 설치한 뒤 나머지를 설치하세요.
+laya는 PyTorch가 CUDA를 인식하면 자동으로 GPU를 씁니다. `scripts\install.ps1`이 아래를 자동으로 처리합니다.
+
+| `nvidia-smi`의 CUDA 버전 | 설치할 PyTorch | 예 |
+|---|---|---|
+| 13.x | `cu130` | RTX 50 시리즈 (sm_120은 cu130 필요) |
+| 12.x | `cu126` | RTX 20/30/40 시리즈 + CUDA 12 드라이버 |
+| 없음 / 11 이하 | `cpu` | GPU 없음, 드라이버 업데이트 필요 |
+
+직접 설치할 때는 **CUDA 빌드 torch를 먼저** 설치합니다.
 
 ```powershell
-py -3.14 -m venv .venv
-.\.venv\Scripts\python.exe -m pip install torch --index-url https://download.pytorch.org/whl/cu130
+.\.venv\Scripts\python.exe -m pip uninstall -y torch     # 이미 CPU torch가 있으면
+.\.venv\Scripts\python.exe -m pip install torch --no-cache-dir --index-url https://download.pytorch.org/whl/cu126
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
-.\.venv\Scripts\python.exe -c "import torch; print(torch.__version__, torch.cuda.is_available(), torch.cuda.get_device_name(0))"
+.\.venv\Scripts\python.exe -c "import torch; print(torch.__version__, torch.cuda.is_available())"
 ```
 
-- 이미 CPU torch가 깔린 venv라면 `python -m pip uninstall -y torch` 후 위 torch 설치 줄을 실행합니다.
-- RTX 50 시리즈(Blackwell, sm_120)는 cu130 빌드가 필요합니다. cu126 빌드에는 sm_120이 없습니다.
-  cu130은 NVIDIA 드라이버 R580 이상이 필요합니다 (`nvidia-smi`로 확인).
+- `Torch not compiled with CUDA enabled` 는 CPU 빌드(`2.14.0+cpu`)가 깔린 상태입니다. pip는 버전이 같으면
+  `Requirement already satisfied`로 넘어가므로 위처럼 먼저 지우고 설치하세요.
+- 빌드가 `+cu126`인데 `False`면 드라이버 문제입니다. `nvidia-smi`로 확인하세요.
 - GPU에서는 기본으로 bf16 autocast를 씁니다. 이 샘플에서는 bf16일 때 라우팅 1건이 CPU와 달라졌고,
-  **`$env:LAYA_CUDA_AMP = "fp16"`** 으로 두면 CPU와 같은 결과가 나왔습니다.
+  **`$env:LAYA_CUDA_AMP = "fp16"`** 으로 두면 CPU와 같은 결과가 나왔습니다. `install.ps1`은 fp16으로 실행합니다.
 - 장치를 직접 고르려면 `local_router(device="cuda")` 또는 `local_router(device="cpu")`.
   `laya-serve`는 `LAYA_DEVICE`, CLI는 `--device`.
-- GPU에 올리지 못하면 경고를 출력하고 CPU로 돌아갑니다. `04_compare_local_llm.py`는 첫 줄에 사용 장치를 출력합니다.
+- VRAM 6GB급 GPU에서 로컬 LLM과 같이 올리면 메모리가 빠듯합니다. 04 예제는 `--laya-only` / `--llm-only`로 나눠 돌리세요.
+- `04_compare_local_llm.py`는 첫 줄에 사용 장치를 출력합니다.
 
 ## 외부 통신 검토 (laya 0.3.21)
 
