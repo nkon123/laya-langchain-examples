@@ -58,6 +58,10 @@ def run(task_names, use_laya, use_llm):
     if use_laya:
         from laya_local import local_router
         router = local_router()
+        # Load both checkpoints up front: the english one would otherwise load on the first
+        # English sample and its load time would count as inference time.
+        router.preload(["english", "multilingual"])
+        print(f"Laya device: {', '.join(sorted({str(a.device) for a in router._agents.values()}))}")
 
     summary = []
     for name in task_names:

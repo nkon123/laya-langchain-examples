@@ -82,19 +82,39 @@ $env:LLM_MODEL = "gemma4:latest"
 
 채팅 UI에 직접 붙여 넣어 볼 프롬프트는 [`prompts/local_llm_prompts.md`](prompts/local_llm_prompts.md)에 있습니다.
 
-측정 예 (Laya: Ryzen 7 9800X3D **CPU** / gemma4 8B Q4: Ollama, RTX 5080 **GPU**):
+측정 예 (Laya: Ryzen 7 9800X3D CPU / RTX 5080 GPU fp16, gemma4 8B Q4: Ollama, RTX 5080 GPU):
 
-| task | n | Laya 정확도 | Laya ms/건 | LLM 정확도 | LLM ms/건 |
-|---|---|---|---|---|---|
-| classify | 4 | 7/8 | 357 | 8/8 | 2,063 |
-| route | 6 | 4/6 | 77 | 6/6 | 2,679 |
-| guard | 8 | 14/16 | 95 | 16/16 | 1,024 |
-| triage | 3 | 8/11 | 267 | 11/11 | 4,005 |
+| task | n | Laya 정확도 | Laya CPU ms/건 | Laya GPU ms/건 | LLM 정확도 | LLM ms/건 |
+|---|---|---|---|---|---|---|
+| classify | 4 | 7/8 | 171 | 36 | 8/8 | 2,063 |
+| route | 6 | 4/6 | 74 | 28 | 6/6 | 2,679 |
+| guard | 8 | 14/16 | 91 | 30 | 16/16 | 1,024 |
+| triage | 3 | 8/11 | 255 | 31 | 11/11 | 4,005 |
 
 - 이 샘플에서는 8B LLM이 모두 맞혔고, Laya는 한국어 문의에서 이탈 위험·긴급도·영업 문의를 놓쳤습니다.
-- Laya는 CPU에서도 LLM(GPU)보다 4~35배 빨랐습니다. GPU 없는 PC라면 LLM은 훨씬 더 느려집니다.
+- Laya는 CPU에서도 LLM(GPU)보다 11~36배, 같은 GPU에서는 34~130배 빨랐습니다. GPU 없는 PC라면 LLM은 훨씬 더 느려집니다.
 - Laya는 답이 항상 정해진 형식(선택지/확률)으로 나와 파싱 실패가 없고, 확률을 임계값으로 조정할 수 있습니다.
 - 21건, 정답 라벨은 작성자 판단이라 벤치마크가 아닙니다. 실제 판단은 자체 데이터로 하세요.
+
+## GPU로 실행 (NVIDIA)
+
+laya는 PyTorch가 CUDA를 인식하면 자동으로 GPU를 씁니다. **CUDA 빌드 torch를 먼저** 설치한 뒤 나머지를 설치하세요.
+
+```powershell
+py -3.14 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install torch --index-url https://download.pytorch.org/whl/cu130
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe -c "import torch; print(torch.__version__, torch.cuda.is_available(), torch.cuda.get_device_name(0))"
+```
+
+- 이미 CPU torch가 깔린 venv라면 `python -m pip uninstall -y torch` 후 위 torch 설치 줄을 실행합니다.
+- RTX 50 시리즈(Blackwell, sm_120)는 cu130 빌드가 필요합니다. cu126 빌드에는 sm_120이 없습니다.
+  cu130은 NVIDIA 드라이버 R580 이상이 필요합니다 (`nvidia-smi`로 확인).
+- GPU에서는 기본으로 bf16 autocast를 씁니다. 이 샘플에서는 bf16일 때 라우팅 1건이 CPU와 달라졌고,
+  **`$env:LAYA_CUDA_AMP = "fp16"`** 으로 두면 CPU와 같은 결과가 나왔습니다.
+- 장치를 직접 고르려면 `local_router(device="cuda")` 또는 `local_router(device="cpu")`.
+  `laya-serve`는 `LAYA_DEVICE`, CLI는 `--device`.
+- GPU에 올리지 못하면 경고를 출력하고 CPU로 돌아갑니다. `04_compare_local_llm.py`는 첫 줄에 사용 장치를 출력합니다.
 
 ## 외부 통신 검토 (laya 0.3.21)
 
